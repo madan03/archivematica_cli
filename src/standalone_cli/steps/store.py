@@ -41,19 +41,69 @@ class StoreAIPStep(Step):
 class StoreDIPStep(Step):
     def execute(self):
         logger.info("Storing DIP...")
-        # For DIP, we usually only want the access copies and some metadata.
-        # Since we didn't strictly separate access/preservation in NormalizeStep (we just made files),
-        # we'll simulate creating a DIP by copying the whole SIP structure but filtering for access formats if possible.
-        # Or just copy the whole thing for now as a "DIP".
         
         sip_path = self.context['sip_path']
+        sip_uuid = self.context.get('sip_uuid', 'no-uuid')
         sip_name = os.path.basename(sip_path)
-        dip_name = f"{sip_name}-{self.context.get('sip_uuid', 'no-uuid')}-DIP"
+        
+        # DIP Name: <SIP_Name>-<UUID> (or just UUID in some configs, but usually Name-UUID)
+        dip_name = f"{sip_name}-{sip_uuid}"
         dest_path = os.path.join(self.context['dip_path'], dip_name)
         
         logger.info(f"Storing DIP at {dest_path}...")
-        try:
-            shutil.copytree(sip_path, dest_path)
-            logger.info("DIP stored.")
-        except Exception as e:
-            logger.error(f"Failed to store DIP: {e}")
+        os.makedirs(dest_path, exist_ok=True)
+        
+        # DIP Structure:
+        #   objects/ (Access copies)
+        #   thumbnails/
+        #   METS.<uuid>.xml
+        
+        # Source paths in SIP (which is now BagIt structure)
+        # SIP Root
+        #   data/
+        #     objects/
+        #     thumbnails/
+        #     METS...xml
+        
+        data_dir = os.path.join(sip_path, 'data')
+        
+        # 1. Copy Objects
+        # In a real scenario, we'd filter for "Access" copies (e.g. MP3 vs WAV).
+        # Here we'll copy everything from data/objects for now, or just normalized ones if we could distinguish.
+        # Let's copy data/objects to DIP/objects
+        src_objects = os.path.join(data_dir, 'objects')
+        dst_objects = os.path.join(dest_path, 'objects')
+        if os.path.exists(src_objects):
+            try:
+                shutil.copytree(src_objects, dst_objects)
+            except Exception as e:
+                logger.warning(f"Failed to copy objects to DIP: {e}")
+        
+        # 2. Copy Thumbnails
+        src_thumbs = os.path.join(data_dir, 'thumbnails')
+        dst_thumbs = os.path.join(dest_path, 'thumbnails')
+        if os.path.exists(src_thumbs):
+            try:
+                shutil.copytree(src_thumbs, dst_thumbs)
+            except Exception as e:
+                logger.warning(f"Failed to copy thumbnails to DIP: {e}")
+
+        # 3. Copy METS
+        # Find METS file in data/
+        mets_file = None
+        for f in os.listdir(data_dir):
+            if f.startswith("METS.") and f.endswith(".xml"):
+                mets_file = f
+                break
+        
+        if mets_file:
+            src_mets = os.path.join(data_dir, mets_file)
+            dst_mets = os.path.join(dest_path, mets_file)
+            try:
+                shutil.copy2(src_mets, dst_mets)
+            except Exception as e:
+                logger.warning(f"Failed to copy METS to DIP: {e}")
+        else:
+            logger.warning("No METS file found in SIP data directory for DIP.")
+
+        logger.info("DIP stored.")
