@@ -1,0 +1,7 @@
+# Archivematica Standalone CLI
+storage/
+processing/
+__pycache__/
+*.pyc
+.env
+.DS_Store

@@ -1,0 +1,4 @@
+click
+sh
+lxml
+python-dotenv
