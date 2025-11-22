@@ -22,7 +22,8 @@ class NormalizeStep(Step):
         # Let's find where the objects are.
         
         sip_root = self.context['sip_path']
-        objects_dir = os.path.join(sip_root, 'data', 'objects')
+        # Objects are now in data/content/objects
+        objects_dir = os.path.join(sip_root, 'data', 'content', 'objects')
         
         if not os.path.exists(objects_dir):
             # Fallback if CreateSIPStep hasn't run or failed
@@ -78,15 +79,23 @@ class CreateSIPStep(Step):
         #   tagmanifest-md5.txt
         
         data_dir = os.path.join(sip_root, 'data')
-        objects_dir = os.path.join(data_dir, 'objects')
-        logs_dir = os.path.join(data_dir, 'logs')
+        content_dir = os.path.join(data_dir, 'content')
+        objects_dir = os.path.join(content_dir, 'objects')
+        metadata_dir = os.path.join(content_dir, 'metadata')
+        logs_dir = os.path.join(content_dir, 'logs')
         thumbnails_dir = os.path.join(data_dir, 'thumbnails')
+        manifests_dir = os.path.join(data_dir, 'manifests')
         
         os.makedirs(objects_dir, exist_ok=True)
+        os.makedirs(metadata_dir, exist_ok=True)
         os.makedirs(logs_dir, exist_ok=True)
         os.makedirs(thumbnails_dir, exist_ok=True)
+        os.makedirs(manifests_dir, exist_ok=True)
         
-        # Move existing content to data/objects
+        # Subdirectories in metadata
+        os.makedirs(os.path.join(metadata_dir, 'submissionDocumentation'), exist_ok=True)
+
+        # Move existing content to data/content/objects
         items = os.listdir(sip_root)
         for item in items:
             if item == 'data':
@@ -99,58 +108,129 @@ class CreateSIPStep(Step):
             except Exception as e:
                 logger.warning(f"Could not move {item} to objects: {e}")
 
-        # Move specific logs to data/logs
+        # Move specific logs to data/content/logs
         for log_file in ['structure_report.txt', 'fido.xml']:
             src = os.path.join(objects_dir, log_file)
             if os.path.exists(src):
                 shutil.move(src, os.path.join(logs_dir, log_file))
 
-        # --- Generate METS ---
-        from ..utils.mets import METSGenerator
-        mets_gen = METSGenerator(sip_uuid, data_dir)
+        # --- Generate Metadata Files ---
         
-        # Add objects to METS
-        object_files = []
-        for root, dirs, files in os.walk(objects_dir):
-            for file in files:
-                file_path = os.path.join(root, file)
-                # Generate a file UUID or ID
-                file_id = hashlib.md5(file_path.encode()).hexdigest() # Simple ID
-                object_files.append((file_path, file_id))
-        
-        mets_gen.add_file_group("original", "group-original", object_files)
-        
-        mets_filename = f"METS.{sip_uuid}.xml"
-        mets_path = os.path.join(data_dir, mets_filename)
-        mets_gen.write(mets_path)
-        logger.info(f"Generated METS file: {mets_path}")
+        # 1. metadata.csv
+        metadata_csv_path = os.path.join(metadata_dir, 'metadata.csv')
+        with open(metadata_csv_path, 'w', newline='') as csvfile:
+            fieldnames = ['filename', 'dc.title', 'dc.creator', 'dc.description', 'dc.date', 'dc.format', 'dc.identifier']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            
+            # Add entries for objects
+            for root, dirs, files in os.walk(objects_dir):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    rel_path = os.path.relpath(file_path, content_dir).replace('\\', '/')
+                    # content_dir is data/content, objects are in data/content/objects
+                    # so rel_path starts with objects/
+                    
+                    writer.writerow({
+                        'filename': rel_path,
+                        'dc.title': file,
+                        'dc.creator': 'Unknown',
+                        'dc.description': f'Imported file {file}',
+                        'dc.date': datetime.date.today().isoformat(),
+                        'dc.format': os.path.splitext(file)[1][1:].upper(),
+                        'dc.identifier': hashlib.md5(file_path.encode()).hexdigest()
+                    })
+
+        # 2. dublin_core.xml
+        dc_path = os.path.join(metadata_dir, 'dublin_core.xml')
+        with open(dc_path, 'w') as f:
+            f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+            f.write('<dublin_core xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://purl.org/dc/terms/ https://dublincore.org/schemas/xmls/qdc/2008/02/11/dcterms.xsd">\n')
+            f.write(f'  <dc:title>AIP {sip_uuid}</dc:title>\n')
+            f.write(f'  <dc:identifier>{sip_uuid}</dc:identifier>\n')
+            f.write(f'  <dc:date>{datetime.date.today().isoformat()}</dc:date>\n')
+            f.write('</dublin_core>')
+            
+        # 3. premis.xml (Detailed)
+        premis_path = os.path.join(metadata_dir, 'premis.xml')
+        with open(premis_path, 'w') as f:
+            f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+            f.write('<premis:premis xmlns:premis="http://www.loc.gov/standards/premis/v3/premis.xsd" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.loc.gov/standards/premis/v3/premis.xsd http://www.loc.gov/standards/premis/v3/premis.xsd" version="3.0">\n')
+            
+            # Object: The AIP itself (Intellectual Entity)
+            f.write('  <premis:object xsi:type="premis:intellectualEntity">\n')
+            f.write('    <premis:objectIdentifier>\n')
+            f.write('      <premis:objectIdentifierType>UUID</premis:objectIdentifierType>\n')
+            f.write(f'      <premis:objectIdentifierValue>{sip_uuid}</premis:objectIdentifierValue>\n')
+            f.write('    </premis:objectIdentifier>\n')
+            f.write('    <premis:originalName>AIP</premis:originalName>\n')
+            f.write('  </premis:object>\n')
+            
+            # Event: Ingest
+            f.write('  <premis:event>\n')
+            f.write('    <premis:eventIdentifier>\n')
+            f.write('      <premis:eventIdentifierType>UUID</premis:eventIdentifierType>\n')
+            f.write(f'      <premis:eventIdentifierValue>{hashlib.md5(b"ingest").hexdigest()}</premis:eventIdentifierValue>\n')
+            f.write('    </premis:eventIdentifier>\n')
+            f.write('    <premis:eventType>ingestion</premis:eventType>\n')
+            f.write(f'    <premis:eventDateTime>{datetime.datetime.now().isoformat()}</premis:eventDateTime>\n')
+            f.write('    <premis:eventDetailInformation>\n')
+            f.write('      <premis:eventDetail>Ingested by Archivematica Standalone CLI</premis:eventDetail>\n')
+            f.write('    </premis:eventDetailInformation>\n')
+            f.write('    <premis:linkingObjectIdentifier>\n')
+            f.write('      <premis:linkingObjectIdentifierType>UUID</premis:linkingObjectIdentifierType>\n')
+            f.write(f'      <premis:linkingObjectIdentifierValue>{sip_uuid}</premis:linkingObjectIdentifierValue>\n')
+            f.write('    </premis:linkingObjectIdentifier>\n')
+            f.write('  </premis:event>\n')
+            
+            # Agent: The CLI
+            f.write('  <premis:agent>\n')
+            f.write('    <premis:agentIdentifier>\n')
+            f.write('      <premis:agentIdentifierType>preservation system</premis:agentIdentifierType>\n')
+            f.write('      <premis:agentIdentifierValue>Archivematica Standalone CLI</premis:agentIdentifierValue>\n')
+            f.write('    </premis:agentIdentifier>\n')
+            f.write('    <premis:agentName>Archivematica Standalone CLI</premis:agentName>\n')
+            f.write('    <premis:agentType>software</premis:agentType>\n')
+            f.write('  </premis:agent>\n')
+            
+            f.write('</premis:premis>')
+
+        # 4. mods.xml (User requested "mode", likely MODS)
+        mods_path = os.path.join(metadata_dir, 'mods.xml')
+        with open(mods_path, 'w') as f:
+            f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+            f.write('<mods:mods xmlns:mods="http://www.loc.gov/mods/v3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.loc.gov/mods/v3 http://www.loc.gov/standards/mods/v3/mods.xsd">\n')
+            f.write('  <mods:titleInfo>\n')
+            f.write(f'    <mods:title>AIP {sip_uuid}</mods:title>\n')
+            f.write('  </mods:titleInfo>\n')
+            f.write('  <mods:typeOfResource>collection</mods:typeOfResource>\n')
+            f.write('  <mods:originInfo>\n')
+            f.write(f'    <mods:dateCreated>{datetime.date.today().isoformat()}</mods:dateCreated>\n')
+            f.write('  </mods:originInfo>\n')
+            f.write('</mods:mods>')
+            
+        # 5. submissionDocumentation
+        # Create dummy processingMCP.xml and rights.csv as per workflow.txt
+        sub_doc_dir = os.path.join(metadata_dir, 'submissionDocumentation')
+        with open(os.path.join(sub_doc_dir, 'processingMCP.xml'), 'w') as f:
+             f.write('<processingMCP>\n  <preconfigs />\n</processingMCP>')
+        with open(os.path.join(sub_doc_dir, 'rights.csv'), 'w') as f:
+             f.write('file,basis,status,country,jurisdiction,start_date,end_date,note\n')
 
         # --- Generate README.html ---
         template_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'templates', 'README.html')
         readme_path = os.path.join(data_dir, "README.html")
         
         try:
-            with open(template_path, 'r') as f:
-                template_content = f.read()
-            
-            # Simple string replacement instead of jinja2 to avoid extra dependency if not needed, 
-            # but user added lxml so maybe they are okay with deps. 
-            # Let's stick to simple replacement for now as requirements.txt didn't strictly have jinja2
-            content = template_content.replace('{{ sip_uuid }}', sip_uuid)
-            content = content.replace('{{ date_generated }}', datetime.datetime.now().isoformat())
-            
-            with open(readme_path, 'w') as f:
-                f.write(content)
-            logger.info(f"Generated README.html: {readme_path}")
+            if os.path.exists(template_path):
+                shutil.copy2(template_path, readme_path)
+                logger.info(f"Generated README.html: {readme_path}")
+            else:
+                logger.warning(f"README.html template not found at {template_path}")
+                with open(readme_path, 'w') as f:
+                    f.write(f"<html><body><h1>AIP {sip_uuid}</h1></body></html>")
         except Exception as e:
             logger.error(f"Failed to generate README.html: {e}")
-            # Fallback
-            with open(readme_path, 'w') as f:
-                f.write(f"<html><body><h1>AIP {sip_uuid}</h1></body></html>")
-
-        # Create dummy thumbnail
-        with open(os.path.join(thumbnails_dir, "thumb_placeholder.txt"), 'w') as f:
-            f.write("Placeholder for thumbnails")
 
         # --- BagIt Files ---
         
@@ -172,11 +252,11 @@ class CreateSIPStep(Step):
             f.write(f"Bag-Size: {bag_size}\n")
             f.write(f"Bag-Group-Identifier: {sip_uuid}\n") # Often same as UUID or Transfer name
 
-        # manifest-sha512.txt
-        self._create_manifest(data_dir, os.path.join(sip_root, "manifest-sha512.txt"), "sha512")
+        # manifest-sha256.txt
+        self._create_manifest(data_dir, os.path.join(sip_root, "manifest-sha256.txt"), "sha256")
 
-        # tagmanifest-md5.txt
-        self._create_tagmanifest(sip_root, os.path.join(sip_root, "tagmanifest-md5.txt"), "md5")
+        # tagmanifest-sha256.txt
+        self._create_tagmanifest(sip_root, os.path.join(sip_root, "tagmanifest-sha256.txt"), "sha256")
         
         logger.info("BagIt SIP structure created.")
 
@@ -222,7 +302,7 @@ class CreateSIPStep(Step):
     def _create_tagmanifest(self, sip_root, tagmanifest_path, algo):
         with open(tagmanifest_path, 'w') as f:
             for item in os.listdir(sip_root):
-                if item == "tagmanifest-md5.txt" or item == "data":
+                if item == "tagmanifest-sha256.txt" or item == "data":
                     continue
                 file_path = os.path.join(sip_root, item)
                 if os.path.isfile(file_path):

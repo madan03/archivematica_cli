@@ -4,3 +4,4 @@ processing/
 __pycache__/
 *.pyc
 .DS_Store
+workflow.txt

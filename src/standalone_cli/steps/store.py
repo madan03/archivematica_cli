@@ -1,3 +1,4 @@
+
 import shutil
 import logging
 import os
@@ -58,20 +59,12 @@ class StoreDIPStep(Step):
         #   thumbnails/
         #   METS.<uuid>.xml
         
-        # Source paths in SIP (which is now BagIt structure)
-        # SIP Root
-        #   data/
-        #     objects/
-        #     thumbnails/
-        #     METS...xml
-        
+        # Source paths in SIP
         data_dir = os.path.join(sip_path, 'data')
+        content_dir = os.path.join(data_dir, 'content')
         
         # 1. Copy Objects
-        # In a real scenario, we'd filter for "Access" copies (e.g. MP3 vs WAV).
-        # Here we'll copy everything from data/objects for now, or just normalized ones if we could distinguish.
-        # Let's copy data/objects to DIP/objects
-        src_objects = os.path.join(data_dir, 'objects')
+        src_objects = os.path.join(content_dir, 'objects')
         dst_objects = os.path.join(dest_path, 'objects')
         if os.path.exists(src_objects):
             try:
@@ -106,4 +99,28 @@ class StoreDIPStep(Step):
         else:
             logger.warning("No METS file found in SIP data directory for DIP.")
 
-        logger.info("DIP stored.")
+        # 4. Create Metadata
+        dst_metadata = os.path.join(dest_path, 'metadata')
+        os.makedirs(dst_metadata, exist_ok=True)
+        with open(os.path.join(dst_metadata, 'dip-metadata.xml'), 'w') as f:
+            f.write('<dip_metadata>Placeholder</dip_metadata>')
+        with open(os.path.join(dst_metadata, 'rights-summary.txt'), 'w') as f:
+            f.write('Rights Summary Placeholder')
+
+        logger.info("DIP structure created.")
+
+        # 5. Compress DIP
+        if self.context['config'].COMPRESSION_ALGORITHM == "7z":
+            archive_name = f"{dest_path}.7z"
+            logger.info(f"Compressing DIP to {archive_name}...")
+            try:
+                # 7z a archive.7z path/to/dip/*
+                # We want the archive to contain the DIP folder or just contents?
+                # Usually DIPs are zipped folders.
+                cmd = [Paths.SEVEN_ZIP_CMD, "a", archive_name, dest_path]
+                subprocess.run(cmd, check=True, capture_output=True)
+                logger.info("DIP compressed and stored.")
+            except Exception as e:
+                logger.error(f"Failed to compress DIP: {e}")
+        else:
+            logger.info("DIP stored (uncompressed).")

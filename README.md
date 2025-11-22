@@ -71,11 +71,12 @@ The CLI performs the following "Automated" workflow:
 5.  **Extract Packages**: Extracts compressed files (zip, rar, etc.).
 6.  **Normalize**: Converts media to preservation and access formats.
 7.  **Create SIP (BagIt)**: Restructures the transfer into a BagIt-compliant SIP.
-    *   Creates `bagit.txt`, `bag-info.txt`, and manifests.
-    *   Moves content to `data/objects`.
-    *   Generates dummy METS and README files.
+    *   Creates `bagit.txt`, `bag-info.txt`, and SHA256 manifests.
+    *   Moves content to `data/content/objects`.
+    *   Generates METS, PREMIS, MODS, and Dublin Core metadata using standard Archivematica namespaces.
+    *   Generates `README.html` using the standard Archivematica template.
 8.  **Store AIP**: Packages the SIP and moves it to AIP storage.
-9.  **Store DIP**: Moves access copies to DIP storage.
+9.  **Store DIP**: Creates a DIP with access copies, thumbnails, and metadata, then compresses it using 7-Zip.
 
 ## Troubleshooting
 
