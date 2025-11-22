@@ -14,10 +14,25 @@ class ScanVirusStep(Step):
             # Recursive scan, suppress summary, only print infected files
             cmd = [Paths.CLAMSCAN_CMD, "-r", self.context['sip_path']]
             logger.info(f"Running: {' '.join(cmd)}")
-            subprocess.run(cmd, check=True, capture_output=True, text=True)
+            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
             logger.info("Virus scan passed.")
+            
+            # Save virus scan log
+            log_path = os.path.join(self.context['sip_path'], 'virus_scan.log')
+            with open(log_path, 'w') as f:
+                f.write(result.stdout)
+                
         except subprocess.CalledProcessError as e:
             logger.error(f"Virus scan failed or found viruses: {e.stderr}")
+            
+            # Save virus scan log even on failure
+            log_path = os.path.join(self.context['sip_path'], 'virus_scan.log')
+            with open(log_path, 'w') as f:
+                f.write(e.stdout) # clamscan writes to stdout even on virus found
+                if e.stderr:
+                    f.write("\nErrors:\n")
+                    f.write(e.stderr)
+
             # Clamscan returns 1 if viruses are found
             if e.returncode == 1:
                 logger.warning("Viruses found! (Continuing for now, but should quarantine)")

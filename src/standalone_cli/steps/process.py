@@ -109,7 +109,7 @@ class CreateSIPStep(Step):
                 logger.warning(f"Could not move {item} to objects: {e}")
 
         # Move specific logs to data/content/logs
-        for log_file in ['structure_report.txt', 'fido.xml']:
+        for log_file in ['structure_report.txt', 'fido.xml', 'virus_scan.log']:
             src = os.path.join(objects_dir, log_file)
             if os.path.exists(src):
                 shutil.move(src, os.path.join(logs_dir, log_file))
