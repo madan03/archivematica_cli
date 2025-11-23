@@ -10,54 +10,7 @@ from ..config import Paths
 
 logger = logging.getLogger(__name__)
 
-class NormalizeStep(Step):
-    def execute(self):
-        logger.info("Normalizing content for preservation and access...")
-        # Simple normalization logic:
-        # - Images -> TIFF (Preservation), JPG (Access)
-        # - Video -> MKV (Preservation), MP4 (Access)
-        # - Audio -> WAV (Preservation), MP3 (Access)
-        
-        # Note: CreateSIPStep runs BEFORE NormalizeStep in our engine list, 
-        # so we expect the structure to be in 'data/objects' now.
-        # Let's find where the objects are.
-        
-        sip_root = self.context['sip_path']
-        # Objects are now in data/content/objects
-        objects_dir = os.path.join(sip_root, 'data', 'content', 'objects')
-        
-        if not os.path.exists(objects_dir):
-            # Fallback if CreateSIPStep hasn't run or failed
-            objects_dir = sip_root
-            
-        for root, dirs, files in os.walk(objects_dir):
-            for file in files:
-                file_path = os.path.join(root, file)
-                filename, ext = os.path.splitext(file)
-                ext = ext.lower()
-                
-                # Images
-                if ext in ['.jpg', '.jpeg', '.png', '.bmp', '.gif']:
-                    # Preservation: TIFF
-                    preservation_path = os.path.join(root, f"{filename}_preservation.tif")
-                    try:
-                        cmd = [Paths.CONVERT_CMD, file_path, "-compress", "lzw", preservation_path]
-                        subprocess.run(cmd, check=True, capture_output=True)
-                        logger.info(f"Normalized {file} to TIFF")
-                    except Exception as e:
-                        logger.warning(f"Failed to normalize image {file}: {e}")
 
-                # Video
-                elif ext in ['.avi', '.mov', '.mp4', '.flv']:
-                    # Preservation: MKV (FFV1)
-                    preservation_path = os.path.join(root, f"{filename}_preservation.mkv")
-                    try:
-                        # ffmpeg -i input -c:v ffv1 -level 3 -g 1 -coder 1 -context 1 -c:a pcm_s24le output.mkv
-                        cmd = [Paths.FFMPEG_CMD, "-i", file_path, "-c:v", "ffv1", "-level", "3", "-c:a", "pcm_s24le", preservation_path, "-y"]
-                        subprocess.run(cmd, check=True, capture_output=True)
-                        logger.info(f"Normalized {file} to MKV")
-                    except Exception as e:
-                         logger.warning(f"Failed to normalize video {file}: {e}")
 
 class CreateSIPStep(Step):
     def execute(self):
@@ -259,6 +212,12 @@ class CreateSIPStep(Step):
         # tagmanifest-sha256.txt
         self._create_tagmanifest(sip_root, os.path.join(sip_root, "tagmanifest-sha256.txt"), "sha256")
         
+        # manifests/manifest.json
+        self._create_manifest_json(data_dir, os.path.join(manifests_dir, "manifests.json"))
+        
+        # manifests/checksums.sha256 (Copy of manifest-sha256.txt)
+        shutil.copy2(os.path.join(sip_root, "manifest-sha256.txt"), os.path.join(manifests_dir, "checksums.sha256"))
+        
         logger.info("BagIt SIP structure created.")
 
     def _calculate_bag_size(self, data_dir):
@@ -316,6 +275,74 @@ class CreateSIPStep(Step):
             while chunk := f.read(8192):
                 h.update(chunk)
         return h.hexdigest()
+
+    def _create_manifest_json(self, data_dir, manifest_path):
+        import json
+        manifest_data = []
+        for root, dirs, files in os.walk(data_dir):
+            for file in files:
+                 file_path = os.path.join(root, file)
+                 sip_root = os.path.dirname(data_dir)
+                 rel_path = os.path.relpath(file_path, sip_root).replace('\\', '/')
+                 
+                 manifest_data.append({
+                     "file": rel_path,
+                     "size": os.path.getsize(file_path),
+                     "sha256": self._hash_file(file_path, "sha256")
+                 })
+        
+        with open(manifest_path, 'w') as f:
+            json.dump(manifest_data, f, indent=4)
+
+class NormalizeStep(Step):
+    def execute(self):
+        logger.info("Normalizing content for preservation and access...")
+        
+        sip_root = self.context['sip_path']
+        objects_dir = os.path.join(sip_root, 'data', 'content', 'objects')
+        thumbnails_dir = os.path.join(sip_root, 'data', 'thumbnails')
+        
+        if not os.path.exists(objects_dir):
+            objects_dir = sip_root
+            
+        for root, dirs, files in os.walk(objects_dir):
+            for file in files:
+                file_path = os.path.join(root, file)
+                filename, ext = os.path.splitext(file)
+                ext = ext.lower()
+                
+                # Images
+                if ext in ['.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tif', '.tiff']:
+                    # Preservation: TIFF (if not already)
+                    if ext not in ['.tif', '.tiff']:
+                        preservation_path = os.path.join(root, f"{filename}_preservation.tif")
+                        try:
+                            cmd = [Paths.CONVERT_CMD, file_path, "-compress", "lzw", preservation_path]
+                            subprocess.run(cmd, check=True, capture_output=True)
+                            logger.info(f"Normalized {file} to TIFF")
+                        except Exception as e:
+                            logger.warning(f"Failed to normalize image {file}: {e}")
+
+                    # Thumbnails
+                    thumb_path = os.path.join(thumbnails_dir, f"{filename}.png")
+                    try:
+                        # convert input -resize 200x200 thumb.png
+                        cmd = [Paths.CONVERT_CMD, file_path, "-resize", "200x200", thumb_path]
+                        subprocess.run(cmd, check=True, capture_output=True)
+                        logger.info(f"Generated thumbnail for {file}")
+                    except Exception as e:
+                        logger.warning(f"Failed to generate thumbnail for {file}: {e}")
+
+                # Video
+                elif ext in ['.avi', '.mov', '.mp4', '.flv']:
+                    # Preservation: MKV (FFV1)
+                    preservation_path = os.path.join(root, f"{filename}_preservation.mkv")
+                    try:
+                        cmd = [Paths.FFMPEG_CMD, "-i", file_path, "-c:v", "ffv1", "-level", "3", "-c:a", "pcm_s24le", preservation_path, "-y"]
+                        subprocess.run(cmd, check=True, capture_output=True)
+                        logger.info(f"Normalized {file} to MKV")
+                    except Exception as e:
+                         logger.warning(f"Failed to normalize video {file}: {e}")
 
 class ProcessContentStep(Step):
     def execute(self):

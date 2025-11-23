@@ -25,7 +25,7 @@ class ProcessingConfiguration:
     DOCUMENT_EMPTY_DIRECTORIES = True
     TRANSCRIBE_SIP_CONTENTS = False
     IDENTIFY_FORMAT_SUBMISSION = True
-    COMPRESSION_ALGORITHM = "Uncompressed" # Options: "Uncompressed", "7z", "tar"
+    COMPRESSION_ALGORITHM = "7z" # Options: "Uncompressed", "7z", "tar"
     COMPRESSION_LEVEL = 1 # 1 (fastest) to 9 (ultra)
     STORE_AIP = True
     UPLOAD_DIP = True
@@ -43,4 +43,4 @@ class Paths:
     FIDO_CMD = "fido"
     SEVEN_ZIP_CMD = "7z"
     FFMPEG_CMD = "ffmpeg"
-    CONVERT_CMD = "magick" # ImageMagick v7+ uses 'magick', v6 uses 'convert'
+    CONVERT_CMD = "convert" # ImageMagick v7+ uses 'magick', v6 uses 'convert'
