@@ -43,5 +43,6 @@ install_if_missing "tree" "tree"
 install_if_missing "python3-pip" "pip3"
 
 
-
+echo "############################"
 echo "All installations completed!"
+echo "############################"

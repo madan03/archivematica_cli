@@ -113,12 +113,7 @@ class StoreDIPStep(Step):
                 subprocess.run(cmd, check=True, capture_output=True)
                 logger.info("DIP compressed and stored.")
                 
-                # Optionally remove the uncompressed directory if we only want the archive
-                # But user said "without with compress in formate folder-name-uuid structure in both aip and dip same like the archimata structure"
-                # Wait, "i dont want the output aip storage in .7z compress file , i want without with compress in formate folder-name-uuid structure"
-                # "if i set the COMPRESSION_LEVEL = 0 then code is not use compress mechangism to do the dip storage compress file if 1 to 9 set base the level compression mechangis set to store dip only compresion .7z mechanism"
-                # So if compressed, we probably just want the .7z file? Or both?
-                # "store dip only compresion .7z mechanism" implies ONLY the .7z file if compressed.
+                
                 
                 shutil.rmtree(dest_path) 
                 
