@@ -3,6 +3,7 @@ import os
 import subprocess
 import shutil
 import hashlib
+import csv
 import datetime
 from . import Step
 from ..config import Paths
