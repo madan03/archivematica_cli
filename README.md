@@ -67,7 +67,7 @@ The CLI uses a `.env` file for configuration.
 3.  **Advanced Configuration (Optional)**:
     You can adjust settings in `src/standalone_cli/config.py`, such as:
     - `COMPRESSION_LEVEL`: Set to `0` for uncompressed DIPs, or `1-9` for 7-Zip compression.
-    - `SCAN_FOR_VIRUSES`: Enable/Disable virus scanning.
+    - `SCAN_FOR_VIRUSES`: True/False to enable/disable virus scanning.
 
 ## Usage
 
@@ -97,7 +97,7 @@ python3 -m src.standalone_cli.main --transfer-path /custom/transfers --aip-stora
 Stored as an uncompressed BagIt directory.
 
 ```
-storage/aips/Grants_025-<UUID>/
+storage/aips/mptest_01-<UUID>/
 ├── bagit.txt
 ├── bag-info.txt
 ├── manifest-sha256.txt
@@ -130,7 +130,7 @@ storage/aips/Grants_025-<UUID>/
 Stored as a `.7z` archive (default) or directory (if `COMPRESSION_LEVEL=0`).
 
 ```
-storage/dips/Grants_025-<UUID>.7z
+storage/dips/mptest_01-<UUID>.7z
 (Contents)
 ├── objects/
 │   └── [Access Copies (JPG, MP4)]
