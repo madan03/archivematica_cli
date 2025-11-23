@@ -20,6 +20,8 @@ install_if_missing() {
     fi
 
     echo "-----------------------------------------"
+    echo "-----------------------------------------"
+    echo "-----------------------------------------"
 }
 
 # Install ClamAV
@@ -36,5 +38,9 @@ install_if_missing "imagemagick" "convert"
 
 # Install Tree
 install_if_missing "tree" "tree"
+
+# Install python3-pip
+install_if_missing "python3-pip" "pip3"
+
 
 echo "All installations completed!"
