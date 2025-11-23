@@ -1,84 +1,148 @@
 # Standalone Archivematica CLI
 
-This is a standalone Python CLI for processing digital archives, inspired by Archivematica's automated workflow. It performs virus scanning, format identification, normalization, and packaging (AIP/DIP) using standard external tools.
+A lightweight, standalone Python CLI for processing digital archives, inspired by Archivematica's automated workflow. It performs virus scanning, format identification, normalization, and packaging (AIP/DIP) using standard external tools.
+
+## Features
+
+- **Virus Scanning**: ClamAV integration.
+- **Format Identification**: FIDO integration.
+- **Normalization**: Converts images to TIFF (preservation) and JPG (access), videos to MKV (preservation) and MP4 (access).
+- **Packaging**: Creates BagIt-compliant AIPs and DIPs.
+- **Metadata**: Generates METS, PREMIS, MODS, and Dublin Core metadata.
+- **Batch Processing**: Automatically processes all subdirectories in the transfer folder.
 
 ## Prerequisites
 
-Ensure the following tools are installed and available in your system PATH:
+Ensure the following tools are installed on your system:
 
 1.  **Python 3.8+**
-2.  **ClamAV** (`clamscan`) - For virus scanning.
-3.  **FIDO** (`fido`) - For file format identification.
-4.  **7-Zip** (`7z`) - For extraction and compression.
-5.  **FFmpeg** (`ffmpeg`) - For audio/video normalization.
-6.  **ImageMagick** (`magick` or `convert`) - For image normalization and thumbnails.
-7.  **Tree** (`tree`) - For generating directory structure reports.
+2.  **ClamAV** (`clamscan`)
+3.  **FIDO** (`fido`)
+4.  **7-Zip** (`7z`)
+5.  **FFmpeg** (`ffmpeg`)
+6.  **ImageMagick** (`convert`)
+7.  **Tree** (`tree`)
 
-### Python Dependencies
+## Installation
 
-Install the required Python packages:
+We provide a script to install all system dependencies (Debian/Ubuntu) and Python requirements.
 
-```bash
-pip install -r src/standalone_cli/requirements.txt
-```
+1.  **Run the installation script**:
+    ```bash
+    chmod +x install_package.sh
+    ./install_package.sh
+    ```
+
+    This script will:
+    - Update `apt` repositories.
+    - Install system tools (ClamAV, FIDO, 7-Zip, FFmpeg, ImageMagick, Tree).
+    - Install Python dependencies from `requirements.txt`.
+
+2.  **Verify Python Dependencies**:
+    If you prefer to install Python dependencies manually:
+    ```bash
+    pip3 install -r src/standalone_cli/requirements.txt
+    ```
 
 ## Configuration
 
 The CLI uses a `.env` file for configuration.
 
-1.  Create a `.env` file in the root directory (or copy the example if provided).
-2.  Define the following variables:
+1.  **Create `.env`**:
+    Create a file named `.env` in the root directory.
+
+2.  **Configure Paths**:
+    Add the following variables to `.env`, adjusting the paths to your system:
 
     ```ini
     # Path to the directory containing transfers to be processed
-    AM_TRANSFER_SOURCE=C:\path\to\transfers
+    AM_TRANSFER_SOURCE=/path/to/your/transfers
 
     # Path where AIPs (Archival Information Packages) will be stored
-    AM_AIP_STORAGE=C:\path\to\storage\aips
+    AM_AIP_STORAGE=/path/to/your/storage/aips
 
     # Path where DIPs (Dissemination Information Packages) will be stored
-    AM_DIP_STORAGE=C:\path\to\storage\dips
+    AM_DIP_STORAGE=/path/to/your/storage/dips
     ```
 
-3.  You can also adjust advanced settings (like disabling specific steps) in `src/standalone_cli/config.py`.
+3.  **Advanced Configuration (Optional)**:
+    You can adjust settings in `src/standalone_cli/config.py`, such as:
+    - `COMPRESSION_LEVEL`: Set to `0` for uncompressed DIPs, or `1-9` for 7-Zip compression.
+    - `SCAN_FOR_VIRUSES`: Enable/Disable virus scanning.
 
 ## Usage
 
 Run the CLI from the root of the repository:
 
 ```bash
-python -m src.standalone_cli.main
+python3 -m src.standalone_cli.main
 ```
 
-By default, it will look for transfers in the configured `AM_TRANSFER_SOURCE` directory.
+The CLI will:
+1.  Scan `AM_TRANSFER_SOURCE` for transfer subdirectories.
+2.  Process each transfer individually.
+3.  Generate an AIP in `AM_AIP_STORAGE`.
+4.  Generate a DIP in `AM_DIP_STORAGE`.
 
 ### Command Line Overrides
 
-You can still override paths via command line arguments if desired:
+You can override paths via command line arguments:
 
 ```bash
-python -m src.standalone_cli.main --transfer-path /path/to/transfer --aip-storage /path/to/aips --dip-storage /path/to/dips
+python3 -m src.standalone_cli.main --transfer-path /custom/transfers --aip-storage /custom/aips --dip-storage /custom/dips
 ```
 
-## Workflow Steps
+## Output Structure
 
-The CLI performs the following "Automated" workflow:
+### AIP (Archival Information Package)
+Stored as an uncompressed BagIt directory.
 
-1.  **Scan for viruses**: Scans the transfer directory using ClamAV.
-2.  **Assign UUIDs**: Renames directories with unique identifiers.
-3.  **Structure Report**: Generates a directory tree text file.
-4.  **Identify Formats**: Uses FIDO to identify file formats.
-5.  **Extract Packages**: Extracts compressed files (zip, rar, etc.).
-6.  **Normalize**: Converts media to preservation and access formats.
-7.  **Create SIP (BagIt)**: Restructures the transfer into a BagIt-compliant SIP.
-    *   Creates `bagit.txt`, `bag-info.txt`, and SHA256 manifests.
-    *   Moves content to `data/content/objects`.
-    *   Generates METS, PREMIS, MODS, and Dublin Core metadata using standard Archivematica namespaces.
-    *   Generates `README.html` using the standard Archivematica template.
-8.  **Store AIP**: Packages the SIP and moves it to AIP storage.
-9.  **Store DIP**: Creates a DIP with access copies, thumbnails, and metadata, then compresses it using 7-Zip.
+```
+storage/aips/Grants_025-<UUID>/
+├── bagit.txt
+├── bag-info.txt
+├── manifest-sha256.txt
+├── tagmanifest-sha256.txt
+└── data/
+    ├── README.html
+    ├── content/
+    │   ├── objects/
+    │   │   └── [Original Files]
+    │   ├── logs/
+    │   │   ├── structure_report.txt
+    │   │   ├── virus_scan.log
+    │   │   └── ...
+    │   └── metadata/
+    │       ├── dublin_core.xml
+    │       ├── premis.xml
+    │       ├── mods.xml
+    │       ├── metadata.csv
+    │       └── submissionDocumentation/
+    │           ├── processingMCP.xml
+    │           └── rights.csv
+    ├── manifests/
+    │   ├── manifests.json
+    │   └── checksums.sha256
+    └── thumbnails/
+        └── [Thumbnail Images]
+```
+
+### DIP (Dissemination Information Package)
+Stored as a `.7z` archive (default) or directory (if `COMPRESSION_LEVEL=0`).
+
+```
+storage/dips/Grants_025-<UUID>.7z
+(Contents)
+├── objects/
+│   └── [Access Copies (JPG, MP4)]
+├── thumbnails/
+│   └── [Thumbnail Images]
+└── metadata/
+    ├── dip-metadata.xml
+    └── rights-summary.txt
+```
 
 ## Troubleshooting
 
-*   **Tool not found errors**: Ensure the external tools (clamscan, ffmpeg, etc.) are in your system's PATH or update the `Tool Paths` in `config.py` with absolute paths.
-*   **Permission errors**: Ensure the script has read/write access to the source and storage directories.
+
+-   **Tool not found errors**: Ensure external tools (clamscan, ffmpeg, etc.) are installed and in your system PATH.
