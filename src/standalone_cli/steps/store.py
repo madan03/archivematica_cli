@@ -20,24 +20,15 @@ class StoreAIPStep(Step):
         aip_name = f"{sip_name}-{self.context.get('sip_uuid', 'no-uuid')}"
         dest_path = os.path.join(self.context['aip_path'], aip_name)
         
-        # Compression
-        if self.context['config'].COMPRESSION_ALGORITHM == "7z":
-            archive_name = f"{dest_path}.7z"
-            logger.info(f"Compressing AIP to {archive_name}...")
-            try:
-                cmd = [Paths.SEVEN_ZIP_CMD, "a", archive_name, sip_path]
-                subprocess.run(cmd, check=True, capture_output=True)
-                logger.info("AIP compressed and stored.")
-            except Exception as e:
-                logger.error(f"Failed to compress AIP: {e}")
-        else:
-            # Uncompressed copy
-            logger.info(f"Copying AIP to {dest_path}...")
-            try:
-                shutil.copytree(sip_path, dest_path)
-                logger.info("AIP stored.")
-            except Exception as e:
-                logger.error(f"Failed to store AIP: {e}")
+        # Always store AIP as uncompressed directory
+        logger.info(f"Copying AIP to {dest_path}...")
+        try:
+            if os.path.exists(dest_path):
+                shutil.rmtree(dest_path)
+            shutil.copytree(sip_path, dest_path)
+            logger.info("AIP stored.")
+        except Exception as e:
+            logger.error(f"Failed to store AIP: {e}")
 
 class StoreDIPStep(Step):
     def execute(self):
@@ -47,11 +38,13 @@ class StoreDIPStep(Step):
         sip_uuid = self.context.get('sip_uuid', 'no-uuid')
         sip_name = os.path.basename(sip_path)
         
-        # DIP Name: <SIP_Name>-<UUID> (or just UUID in some configs, but usually Name-UUID)
+        # DIP Name: <SIP_Name>-<UUID>
         dip_name = f"{sip_name}-{sip_uuid}"
         dest_path = os.path.join(self.context['dip_path'], dip_name)
         
-        logger.info(f"Storing DIP at {dest_path}...")
+        logger.info(f"Storing DIP structure at {dest_path}...")
+        if os.path.exists(dest_path):
+            shutil.rmtree(dest_path)
         os.makedirs(dest_path, exist_ok=True)
         
         # DIP Structure:
@@ -109,17 +102,26 @@ class StoreDIPStep(Step):
 
         logger.info("DIP structure created.")
 
-        # 5. Compress DIP
-        if self.context['config'].COMPRESSION_ALGORITHM == "7z":
+        # 5. Compress DIP if COMPRESSION_LEVEL > 0
+        compression_level = self.context['config'].COMPRESSION_LEVEL
+        if compression_level > 0:
             archive_name = f"{dest_path}.7z"
-            logger.info(f"Compressing DIP to {archive_name}...")
+            logger.info(f"Compressing DIP to {archive_name} (Level {compression_level})...")
             try:
-                # 7z a archive.7z path/to/dip/*
-                # We want the archive to contain the DIP folder or just contents?
-                # Usually DIPs are zipped folders.
-                cmd = [Paths.SEVEN_ZIP_CMD, "a", archive_name, dest_path]
+                # 7z a -mx=N archive.7z path/to/dip
+                cmd = [Paths.SEVEN_ZIP_CMD, "a", f"-mx={compression_level}", archive_name, dest_path]
                 subprocess.run(cmd, check=True, capture_output=True)
                 logger.info("DIP compressed and stored.")
+                
+                # Optionally remove the uncompressed directory if we only want the archive
+                # But user said "without with compress in formate folder-name-uuid structure in both aip and dip same like the archimata structure"
+                # Wait, "i dont want the output aip storage in .7z compress file , i want without with compress in formate folder-name-uuid structure"
+                # "if i set the COMPRESSION_LEVEL = 0 then code is not use compress mechangism to do the dip storage compress file if 1 to 9 set base the level compression mechangis set to store dip only compresion .7z mechanism"
+                # So if compressed, we probably just want the .7z file? Or both?
+                # "store dip only compresion .7z mechanism" implies ONLY the .7z file if compressed.
+                
+                shutil.rmtree(dest_path) 
+                
             except Exception as e:
                 logger.error(f"Failed to compress DIP: {e}")
         else:
