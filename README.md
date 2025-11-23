@@ -17,11 +17,10 @@ Ensure the following tools are installed on your system:
 
 1.  **Python 3.8+**
 2.  **ClamAV** (`clamscan`)
-3.  **FIDO** (`fido`)
-4.  **7-Zip** (`7z`)
-5.  **FFmpeg** (`ffmpeg`)
-6.  **ImageMagick** (`convert`)
-7.  **Tree** (`tree`)
+3.  **7-Zip** (`7z`)
+4.  **FFmpeg** (`ffmpeg`)
+5.  **ImageMagick** (`convert`)
+6.  **Tree** (`tree`)
 
 ## Installation
 
@@ -35,7 +34,7 @@ We provide a script to install all system dependencies (Debian/Ubuntu) and Pytho
 
     This script will:
     - Update `apt` repositories.
-    - Install system tools (ClamAV, FIDO, 7-Zip, FFmpeg, ImageMagick, Tree).
+    - Install system tools (ClamAV, 7-Zip, FFmpeg, ImageMagick, Tree).
     - Install Python dependencies from `requirements.txt`.
 
 2.  **Verify Python Dependencies**:

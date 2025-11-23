@@ -90,8 +90,8 @@ class METSGenerator:
             flocat = etree.SubElement(file_el, f"{{{self.NS_METS}}}FLocat", 
                                       LOCTYPE="URL", 
                                       href=rel_path,
-                                      {f"{{{self.NS_XLINK}}}type"}: "simple",
-                                      {f"{{{self.NS_XLINK}}}title"}: os.path.basename(file_path))
+                                      **{f"{{{self.NS_XLINK}}}type": "simple",
+                                         f"{{{self.NS_XLINK}}}title": os.path.basename(file_path)})
             
             # Update StructMap
             fptr = etree.SubElement(self.div_root, f"{{{self.NS_METS}}}fptr", FILEID=f"file-{file_uuid}")

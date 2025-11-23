@@ -42,8 +42,6 @@ install_if_missing "tree" "tree"
 # Install python3-pip
 install_if_missing "python3-pip" "pip3"
 
-# Install Python Requirements
-echo "Installing Python dependencies..."
-pip3 install -r src/standalone_cli/requirements.txt
+
 
 echo "All installations completed!"

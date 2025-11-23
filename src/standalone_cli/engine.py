@@ -60,6 +60,11 @@ class WorkflowEngine:
             
         if self.config.STORE_DIP:
             self.steps.append(StoreDIPStep(self.context))
+            
+        # Note: Other flags like DELETE_PACKAGE_AFTER_EXTRACTION, THUMBNAIL_MODE, etc.
+        # are handled within the steps themselves.
+        # CHECK_ACCESS_POLICY, BIND_PIDS, TRANSCRIBE_SIP_CONTENTS are currently False
+        # and not implemented, so no steps are added for them.
 
     def run(self):
         logger.info("Starting Automated Workflow...")

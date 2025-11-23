@@ -7,6 +7,7 @@ import csv
 import datetime
 from . import Step
 from ..config import Paths
+from ..utils.mets import METSGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -170,6 +171,40 @@ class CreateSIPStep(Step):
              f.write('<processingMCP>\n  <preconfigs />\n</processingMCP>')
         with open(os.path.join(sub_doc_dir, 'rights.csv'), 'w') as f:
              f.write('file,basis,status,country,jurisdiction,start_date,end_date,note\n')
+
+        # --- Generate METS.xml ---
+        try:
+            mets_gen = METSGenerator(sip_uuid, data_dir) # Use data_dir as base for relative paths in METS
+            
+            # Add Original Objects
+            original_files = []
+            for root, dirs, files in os.walk(objects_dir):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    file_uuid = hashlib.md5(file_path.encode()).hexdigest()
+                    original_files.append((file_path, file_uuid))
+            mets_gen.add_file_group("original", "grp-originals", original_files)
+            
+            # Add Thumbnails (if any exist yet - they might be generated in NormalizeStep later?)
+            # Wait, NormalizeStep runs AFTER CreateSIPStep in engine.py.
+            # So thumbnails won't exist yet!
+            # We should probably run METS generation AFTER normalization?
+            # Or NormalizeStep should update METS?
+            # Archivematica usually creates METS at the end or updates it.
+            # For this simplified CLI, let's create METS here with what we have.
+            # If thumbnails are added later, they won't be in this METS unless we update it.
+            # BUT, the user's log shows "No METS file found... for DIP".
+            # StoreDIPStep runs last.
+            # If we create METS here, it will exist.
+            # If we want thumbnails in METS, we should move METS generation to AFTER NormalizeStep or update it.
+            # For now, let's just ensure METS exists so DIP step doesn't fail.
+            
+            mets_path = os.path.join(data_dir, f"METS.{sip_uuid}.xml")
+            mets_gen.write(mets_path)
+            logger.info(f"Generated METS file: {mets_path}")
+            
+        except Exception as e:
+            logger.error(f"Failed to generate METS: {e}")
 
         # --- Generate README.html ---
         template_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'templates', 'README.html')

@@ -25,11 +25,13 @@ class ProcessingConfiguration:
     DOCUMENT_EMPTY_DIRECTORIES = True
     TRANSCRIBE_SIP_CONTENTS = False
     IDENTIFY_FORMAT_SUBMISSION = True
-    COMPRESSION_ALGORITHM = "7z" # Options: "Uncompressed", "7z", "tar" (Not used for AIP anymore)
-    COMPRESSION_LEVEL = 5 # 0 = Uncompressed DIP, 1-9 = 7z Compressed DIP
+
     STORE_AIP = True
     UPLOAD_DIP = True
     STORE_DIP = True
+    
+    COMPRESSION_ALGORITHM = "7z" # Options: "Uncompressed", "7z", "tar" (Not used for AIP anymore)
+    COMPRESSION_LEVEL = 0 # 0 = Uncompressed DIP, 1-9 = 7z Compressed DIP
 
 class Paths:
     # Default paths - EDIT THESE or set via environment variables
