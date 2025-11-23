@@ -15,7 +15,7 @@ A lightweight, standalone Python CLI for processing digital archives, inspired b
 
 Ensure the following tools are installed on your system:
 
-1.  **Python 3.8+**
+1.  **Python 3.10+**
 2.  **ClamAV** (`clamscan`)
 3.  **7-Zip** (`7z`)
 4.  **FFmpeg** (`ffmpeg`)
